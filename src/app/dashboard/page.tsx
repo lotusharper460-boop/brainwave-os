@@ -4,6 +4,14 @@ import React, { useEffect, useState, Fragment } from 'react'
 import { supabase } from '@/utils/supabase/client';
 
 export default function AnalyticsDashboard() {
+  // Authentication States
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [pin, setPin] = useState("");
+  const [pinError, setPinError] = useState(false);
+  
+  // Define your hardcoded PIN here
+  const SECURE_PIN = "121231";
+
   const [responses, setResponses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
@@ -17,9 +25,12 @@ export default function AnalyticsDashboard() {
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [emailSuccess, setEmailSuccess] = useState(false);
 
+  // Only fetch data AFTER the user is authenticated
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (isAuthenticated) {
+      fetchData();
+    }
+  }, [isAuthenticated]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -34,6 +45,15 @@ export default function AnalyticsDashboard() {
     setLoading(false);
   };
 
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (pin === SECURE_PIN) {
+      setIsAuthenticated(true);
+    } else {
+      setPinError(true);
+    }
+  };
+
   // --- CONTACT FORMATTERS ---
   const cleanPhoneNumber = (phone: string) => {
     if (!phone) return "";
@@ -43,7 +63,6 @@ export default function AnalyticsDashboard() {
     return cleaned;
   };
 
-  // Used for individual 1-on-1 WhatsApp sends
   const formatWhatsAppLink = (phone: string) => {
     const cleaned = cleanPhoneNumber(phone);
     if (!cleaned) return "#";
@@ -51,7 +70,6 @@ export default function AnalyticsDashboard() {
     return `https://wa.me/${cleaned}?text=${message}`;
   };
 
-  // Used for the Bulk Copy feature
   const allPhoneNumbers = responses
     .map(r => r.phone_number)
     .filter(phone => phone && phone !== "Not Provided")
@@ -59,7 +77,6 @@ export default function AnalyticsDashboard() {
     .join(', ');
 
   // --- BULK MESSAGING ACTIONS ---
-  
   const handleCopyBulkNumbers = () => {
     if (!allPhoneNumbers) return alert("No valid phone numbers found.");
     navigator.clipboard.writeText(allPhoneNumbers);
@@ -205,6 +222,53 @@ export default function AnalyticsDashboard() {
     </div>
   );
 
+
+  // ==========================================
+  // AUTHENTICATION MODAL (Shown if locked)
+  // ==========================================
+  if (!isAuthenticated) {
+    return (
+      <main className="min-h-screen bg-[#1A1A1B] text-[#E5E7EB] flex items-center justify-center p-4 font-sans">
+        <div className="bg-[#242426] border border-[#37373A] rounded-2xl p-8 max-w-sm w-full shadow-2xl animate-in fade-in zoom-in duration-300">
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 bg-[#00B8CC]/10 text-[#00B8CC] rounded-full flex items-center justify-center mx-auto mb-5 border border-[#00B8CC]/30 shadow-[0_0_15px_rgba(0,184,204,0.2)]">
+              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+            </div>
+            <h2 className="text-2xl font-black bg-clip-text text-transparent bg-gradient-to-r from-[#00B8CC] to-[#E5C100]">Admin Gateway</h2>
+            <p className="text-xs font-medium text-[#9CA3AF] mt-2 tracking-wide">Enter your secure PIN to access analytics.</p>
+          </div>
+          
+          <form onSubmit={handleLogin}>
+            <input
+              type="password"
+              maxLength={6}
+              value={pin}
+              onChange={(e) => {
+                setPin(e.target.value.replace(/\D/g, ''));
+                setPinError(false);
+              }}
+              className={`w-full bg-[#1A1A1B] border ${pinError ? 'border-red-500' : 'border-[#37373A]'} rounded-xl p-4 text-center text-3xl tracking-[0.5em] font-mono text-[#E5E7EB] outline-none focus:border-[#00B8CC] transition-all mb-4 shadow-inner`}
+              placeholder="••••••"
+              autoFocus
+            />
+            {pinError && <p className="text-red-500 text-xs font-bold text-center mb-4 animate-bounce">Incorrect PIN. Access Denied.</p>}
+            <button 
+              type="submit"
+              className="w-full py-4 mt-2 bg-[#00B8CC] text-[#1A1A1B] font-black rounded-xl uppercase tracking-widest text-xs hover:shadow-[0_0_20px_rgba(0,184,204,0.4)] transition-all"
+            >
+              Unlock Dashboard
+            </button>
+          </form>
+        </div>
+      </main>
+    );
+  }
+
+  // ==========================================
+  // MAIN DASHBOARD (Shown if authenticated)
+  // ==========================================
   return (
     <main className="min-h-screen bg-[#1A1A1B] text-[#E5E7EB] p-4 sm:p-8 font-sans pb-32">
       
@@ -234,16 +298,32 @@ export default function AnalyticsDashboard() {
         </div>
       )}
 
-      {/* TAB NAVIGATION */}
-      <div className="max-w-7xl mx-auto mb-8 flex flex-wrap gap-2 border-b border-[#37373A] pb-px">
-        <button onClick={() => setActiveTab('analytics')} className={`px-6 py-3 font-bold text-sm rounded-t-xl transition-all ${activeTab === 'analytics' ? 'bg-[#242426] text-[#00B8CC] border-t border-l border-r border-[#37373A]' : 'text-[#9CA3AF] hover:text-[#E5E7EB]'}`}>Data Analytics</button>
-        <button onClick={() => setActiveTab('responses')} className={`px-6 py-3 font-bold text-sm rounded-t-xl transition-all ${activeTab === 'responses' ? 'bg-[#242426] text-[#00B8CC] border-t border-l border-r border-[#37373A]' : 'text-[#9CA3AF] hover:text-[#E5E7EB]'}`}>Individual Responses</button>
-        <button onClick={() => setActiveTab('messaging')} className={`px-6 py-3 font-bold text-sm rounded-t-xl transition-all flex items-center gap-2 ${activeTab === 'messaging' ? 'bg-[#242426] text-[#E5C100] border-t border-l border-r border-[#37373A]' : 'text-[#9CA3AF] hover:text-[#E5C100]'}`}>
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
-          </svg>
-          Communication Hub
-        </button>
+      {/* COMPACT & SCROLLABLE TAB NAVIGATION */}
+      <div className="max-w-7xl mx-auto mb-8">
+        {/* Hide scrollbar classes combined with flex-nowrap to allow horizontal swipe on small screens */}
+        <div className="flex overflow-x-auto gap-2 border-b border-[#37373A] pb-px [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+          <button 
+            onClick={() => setActiveTab('analytics')}
+            className={`shrink-0 px-4 py-2.5 font-bold text-xs rounded-t-xl transition-all ${activeTab === 'analytics' ? 'bg-[#242426] text-[#00B8CC] border-t border-l border-r border-[#37373A]' : 'text-[#9CA3AF] hover:text-[#E5E7EB]'}`}
+          >
+            Data Analytics
+          </button>
+          <button 
+            onClick={() => setActiveTab('responses')}
+            className={`shrink-0 px-4 py-2.5 font-bold text-xs rounded-t-xl transition-all ${activeTab === 'responses' ? 'bg-[#242426] text-[#00B8CC] border-t border-l border-r border-[#37373A]' : 'text-[#9CA3AF] hover:text-[#E5E7EB]'}`}
+          >
+            Individual Responses
+          </button>
+          <button 
+            onClick={() => setActiveTab('messaging')}
+            className={`shrink-0 px-4 py-2.5 font-bold text-xs rounded-t-xl transition-all flex items-center gap-1.5 ${activeTab === 'messaging' ? 'bg-[#242426] text-[#E5C100] border-t border-l border-r border-[#37373A]' : 'text-[#9CA3AF] hover:text-[#E5C100]'}`}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+            </svg>
+            Communication Hub
+          </button>
+        </div>
       </div>
 
       {/* VIEW 1: DATA ANALYTICS */}
@@ -340,7 +420,6 @@ export default function AnalyticsDashboard() {
 
                         <td className="p-5 align-top">
                           <div className="flex flex-col gap-2">
-                            {/* RESTORED 1-ON-1 WHATSAPP BUTTON */}
                             <a href={formatWhatsAppLink(res.phone_number)} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 px-3 py-2 bg-[#25D366]/10 border border-[#25D366]/30 text-[#25D366] rounded-lg hover:bg-[#25D366] hover:text-[#1A1A1B] transition-all font-bold text-[11px] uppercase tracking-wider">
                               WhatsApp
                             </a>

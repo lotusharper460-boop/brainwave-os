@@ -92,13 +92,12 @@ export default function DiscoverySurvey() {
     setLoading(true);
     
     // --- EXACT 1:1 SQL SCHEMA MAPPING (PREVENTS DATABASE CRASHES) ---
-    // Note: We DO NOT use "...A" here to prevent sending wrong column names.
     const payload = {
       school_name: A.school_name,
       respondent_name: A.proprietor_name,
       role: A.role,
       phone_number: A.phone,
-      email_address: A.email, // Maps to email_address in your DB
+      email_address: A.email,
       date_administered: new Date().toISOString(),
       
       q1_enrollment: A.q1,
@@ -154,6 +153,14 @@ export default function DiscoverySurvey() {
     setLoading(false);
   }
 
+  // --- REUSABLE QUESTION TIP UI ---
+  const QuestionTip = ({ text }: { text: string }) => (
+    <p className="text-[11px] text-[#9CA3AF] mt-1 mb-3 flex items-start gap-1.5 italic leading-relaxed">
+      <span className="text-[#E5C100] text-sm leading-none">💡</span>
+      <span>{text}</span>
+    </p>
+  );
+
   if (done) return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center">
       <div className="w-20 h-20 bg-[#E5C100] rounded-full flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(229,193,0,0.3)]">
@@ -208,20 +215,35 @@ export default function DiscoverySurvey() {
                   </p>
                 </div>
 
-                <div><label className="block text-xs font-bold text-[#9CA3AF] uppercase tracking-wider mb-2">Name of School *</label>
-                <input className="input-soft" placeholder="Enter school name" onChange={e => setVal('school_name', e.target.value)} value={A.school_name || ''} /></div>
+                <div>
+                  <label className="block text-xs font-bold text-[#9CA3AF] uppercase tracking-wider mb-1">Name of School *</label>
+                  <QuestionTip text="We use this to group responses and understand the types of schools we are serving." />
+                  <input className="input-soft" placeholder="Enter school name" onChange={e => setVal('school_name', e.target.value)} value={A.school_name || ''} />
+                </div>
                 
-                <div><label className="block text-xs font-bold text-[#9CA3AF] uppercase tracking-wider mb-2">Proprietor Name *</label>
-                <input className="input-soft" placeholder="Enter full name" onChange={e => setVal('proprietor_name', e.target.value)} value={A.proprietor_name || ''} /></div>
+                <div>
+                  <label className="block text-xs font-bold text-[#9CA3AF] uppercase tracking-wider mb-1">Proprietor Name *</label>
+                  <QuestionTip text="So we know who we are speaking to when we share our research findings." />
+                  <input className="input-soft" placeholder="Enter full name" onChange={e => setVal('proprietor_name', e.target.value)} value={A.proprietor_name || ''} />
+                </div>
                 
-                <div><label className="block text-xs font-bold text-[#9CA3AF] uppercase tracking-wider mb-2">Role / Position *</label>
-                <input className="input-soft" placeholder="e.g. Proprietor, Principal" onChange={e => setVal('role', e.target.value)} value={A.role || ''} /></div>
+                <div>
+                  <label className="block text-xs font-bold text-[#9CA3AF] uppercase tracking-wider mb-1">Role / Position *</label>
+                  <QuestionTip text="Helps us understand your specific daily responsibilities." />
+                  <input className="input-soft" placeholder="e.g. Proprietor, Principal" onChange={e => setVal('role', e.target.value)} value={A.role || ''} />
+                </div>
 
-                <div><label className="block text-xs font-bold text-[#9CA3AF] uppercase tracking-wider mb-2">Phone Number *</label>
-                <input className="input-soft" type="tel" placeholder="080..." onChange={e => setVal('phone', e.target.value)} value={A.phone || ''} /></div>
+                <div>
+                  <label className="block text-xs font-bold text-[#9CA3AF] uppercase tracking-wider mb-1">Phone Number *</label>
+                  <QuestionTip text="We will only contact you if we need clarity on a specific answer or to share the final software." />
+                  <input className="input-soft" type="tel" placeholder="080..." onChange={e => setVal('phone', e.target.value)} value={A.phone || ''} />
+                </div>
                 
-                <div><label className="block text-xs font-bold text-[#9CA3AF] uppercase tracking-wider mb-2">Email Address *</label>
-                <input className="input-soft" type="email" placeholder="school@email.com" onChange={e => setVal('email', e.target.value)} value={A.email || ''} /></div>
+                <div>
+                  <label className="block text-xs font-bold text-[#9CA3AF] uppercase tracking-wider mb-1">Email Address *</label>
+                  <QuestionTip text="Where we will send updates regarding the software release." />
+                  <input className="input-soft" type="email" placeholder="school@email.com" onChange={e => setVal('email', e.target.value)} value={A.email || ''} />
+                </div>
               </div>
             </div>
           )}
@@ -231,38 +253,50 @@ export default function DiscoverySurvey() {
             <div className="animate-in fade-in duration-300">
               <div className="sec-header"><h2 className="text-xl font-bold text-[#E5E7EB]">Section 01: School Profile</h2></div>
               <div className="p-8 space-y-8">
-                <div><p className="font-semibold text-[#E5E7EB] mb-3">Q1. Student Enrollment? *</p>
+                <div>
+                  <p className="font-semibold text-[#E5E7EB] mb-1">Q1. Student Enrollment? *</p>
+                  <QuestionTip text="Helps us understand the volume of student data your school handles daily." />
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {['Under 100', '101–200', '201–350', '351–500', '501–750', 'Above 750'].map(opt => (
                       <button key={opt} className={`option-btn ${A.q1 === opt ? 'option-active' : ''}`} onClick={() => setVal('q1', opt)}>{opt}</button>
                     ))}
                   </div>
                 </div>
-                <div><p className="font-semibold text-[#E5E7EB] mb-3">Q2. Levels Offered? (Tick all) *</p>
+                <div>
+                  <p className="font-semibold text-[#E5E7EB] mb-1">Q2. Levels Offered? (Tick all) *</p>
+                  <QuestionTip text="Different levels require different features (e.g., grading systems for Secondary vs. Nursery)." />
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {['Crèche / Nursery', 'Primary (1–6)', 'Junior Secondary (JSS 1–3)', 'Senior Secondary (SSS 1–3)'].map(opt => (
                       <button key={opt} className={`option-btn ${A.q2.includes(opt) ? 'option-active' : ''}`} onClick={() => toggleArr('q2', opt)}>{opt}</button>
                     ))}
                   </div>
                 </div>
-                <div><p className="font-semibold text-[#E5E7EB] mb-3">Q3. Staff count (Teaching & Non-teaching)? *</p>
+                <div>
+                  <p className="font-semibold text-[#E5E7EB] mb-1">Q3. Staff count (Teaching & Non-teaching)? *</p>
+                  <QuestionTip text="Helps us design the staff management and payroll features appropriately." />
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {['1–10 staff', '11–25 staff', '26–50 staff', '51–100 staff', 'Above 100 staff'].map(opt => (
                       <button key={opt} className={`option-btn ${A.q3 === opt ? 'option-active' : ''}`} onClick={() => setVal('q3', opt)}>{opt}</button>
                     ))}
                   </div>
                 </div>
-                <div><p className="font-semibold text-[#E5E7EB] mb-3">Q4. How many classes / streams exist? *</p>
+                <div>
+                  <p className="font-semibold text-[#E5E7EB] mb-1">Q4. How many classes / streams exist? *</p>
+                  <QuestionTip text="Tells us how complex your timetabling and report card generation might be." />
                   <input className="input-soft" type="number" placeholder="Total number of classes" onChange={e => setVal('q4', e.target.value)} value={A.q4 || ''} />
                 </div>
-                <div><p className="font-semibold text-[#E5E7EB] mb-3">Q5. Average school fee per student per term? (₦) *</p>
+                <div>
+                  <p className="font-semibold text-[#E5E7EB] mb-1">Q5. Average school fee per student per term? (₦) *</p>
+                  <QuestionTip text="This ensures we build a product with a pricing plan that actually fits your school's revenue model." />
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {['Below ₦20,000', '₦20,001–₦40,000', '₦40,001–₦70,000', '₦70,001–₦100,000', '₦100,001–₦200,000', 'Above ₦200,000'].map(opt => (
                       <button key={opt} className={`option-btn ${A.q5 === opt ? 'option-active' : ''}`} onClick={() => setVal('q5', opt)}>{opt}</button>
                     ))}
                   </div>
                 </div>
-                <div><p className="font-semibold text-[#E5E7EB] mb-3">Q6. Which city and area is your school located in? *</p>
+                <div>
+                  <p className="font-semibold text-[#E5E7EB] mb-1">Q6. Which city and area is your school located in? *</p>
+                  <QuestionTip text="Internet and power stability vary by area; this helps us optimize the app for your location." />
                   <input className="input-soft" placeholder="City / LGA / Area" onChange={e => setVal('q6', e.target.value)} value={A.q6 || ''} />
                 </div>
               </div>
@@ -274,28 +308,36 @@ export default function DiscoverySurvey() {
             <div className="animate-in fade-in duration-300">
               <div className="sec-header"><h2 className="text-xl font-bold text-[#E5E7EB]">Section 02: Operations</h2></div>
               <div className="p-8 space-y-8">
-                <div><p className="font-semibold text-[#E5E7EB] mb-3">Q7. How do you manage student records? (Tick all) *</p>
+                <div>
+                  <p className="font-semibold text-[#E5E7EB] mb-1">Q7. How do you manage student records? (Tick all) *</p>
+                  <QuestionTip text="We want to know if you prefer physical paper or if you've already tried digital tools." />
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {['Paper files', 'Excel / Sheets', 'Existing software', 'WhatsApp', 'No formal system'].map(opt => (
                       <button key={opt} className={`option-btn ${A.q7.includes(opt) ? 'option-active' : ''}`} onClick={() => toggleArr('q7', opt)}>{opt}</button>
                     ))}
                   </div>
                 </div>
-                <div><p className="font-semibold text-[#E5E7EB] mb-3">Q8. How do you track school fees? (Tick all) *</p>
+                <div>
+                  <p className="font-semibold text-[#E5E7EB] mb-1">Q8. How do you track school fees? (Tick all) *</p>
+                  <QuestionTip text="Helps us understand how to build the payment tracking dashboard." />
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {['Cash/Paper receipts', 'Bank transfers', 'POS machine', 'Existing software', 'No consistent tracking'].map(opt => (
                       <button key={opt} className={`option-btn ${A.q8.includes(opt) ? 'option-active' : ''}`} onClick={() => toggleArr('q8', opt)}>{opt}</button>
                     ))}
                   </div>
                 </div>
-                <div><p className="font-semibold text-[#E5E7EB] mb-3">Q9. How do you take attendance? (Tick all) *</p>
+                <div>
+                  <p className="font-semibold text-[#E5E7EB] mb-1">Q9. How do you take attendance? (Tick all) *</p>
+                  <QuestionTip text="Tells us if we should build a quick mobile app feature for teachers in the classroom." />
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {['Paper register', 'WhatsApp message', 'Excel spreadsheet', 'Existing software', 'Not tracked'].map(opt => (
                       <button key={opt} className={`option-btn ${A.q9.includes(opt) ? 'option-active' : ''}`} onClick={() => toggleArr('q9', opt)}>{opt}</button>
                     ))}
                   </div>
                 </div>
-                <div><p className="font-semibold text-[#E5E7EB] mb-3">Q10. Rank top 3 administrative challenges *</p>
+                <div>
+                  <p className="font-semibold text-[#E5E7EB] mb-1">Q10. Rank top 3 administrative challenges *</p>
+                  <QuestionTip text="Click 3 items in order of priority. This tells us which problem we MUST solve for you first." />
                   <div className="space-y-3">
                     {['Fee Tracking', 'Report Cards', 'Parent Communication', 'Attendance', 'Staff Payroll', 'Academic Records', 'Bulk SMS', 'Timetabling'].map(opt => (
                       <button key={opt} className={`option-btn flex gap-3 ${A.q10[opt] ? 'option-active' : ''}`} onClick={() => handleRank(opt)}>
@@ -307,14 +349,18 @@ export default function DiscoverySurvey() {
                     ))}
                   </div>
                 </div>
-                <div><p className="font-semibold text-[#E5E7EB] mb-3">Q11. Admin time spent per week on records? *</p>
+                <div>
+                  <p className="font-semibold text-[#E5E7EB] mb-1">Q11. Admin time spent per week on records? *</p>
+                  <QuestionTip text="We want to measure exactly how much time our software will save you every week." />
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {['Less than 2 hours', '2–5 hours', '5–10 hours', '10–20 hours', 'More than 20 hours'].map(opt => (
                       <button key={opt} className={`option-btn ${A.q11 === opt ? 'option-active' : ''}`} onClick={() => setVal('q11', opt)}>{opt}</button>
                     ))}
                   </div>
                 </div>
-                <div><p className="font-semibold text-[#E5E7EB] mb-3">Q12. How often do errors occur? *</p>
+                <div>
+                  <p className="font-semibold text-[#E5E7EB] mb-1">Q12. How often do errors occur? *</p>
+                  <QuestionTip text="Knowing common mistakes helps us design 'safety features' to prevent them." />
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                     {['Rarely', 'Sometimes', 'Often', 'Very often'].map(opt => (
                       <button key={opt} className={`option-btn ${A.q12 === opt ? 'option-active' : ''}`} onClick={() => setVal('q12', opt)}>{opt}</button>
@@ -331,28 +377,36 @@ export default function DiscoverySurvey() {
             <div className="animate-in fade-in duration-300">
               <div className="sec-header"><h2 className="text-xl font-bold text-[#E5E7EB]">Section 03: Tech Readiness</h2></div>
               <div className="p-8 space-y-8">
-                <div><p className="font-semibold text-[#E5E7EB] mb-3">Q13. Devices used by staff regularly (Tick all) *</p>
+                <div>
+                  <p className="font-semibold text-[#E5E7EB] mb-1">Q13. Devices used by staff regularly (Tick all) *</p>
+                  <QuestionTip text="Tells us if we should focus on building a Mobile App, a Computer Web App, or both." />
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {['Smartphone (Android)', 'Smartphone (iPhone)', 'Laptop / Desktop', 'Tablet', 'No consistent device'].map(opt => (
                       <button key={opt} className={`option-btn ${A.q13.includes(opt) ? 'option-active' : ''}`} onClick={() => toggleArr('q13', opt)}>{opt}</button>
                     ))}
                   </div>
                 </div>
-                <div><p className="font-semibold text-[#E5E7EB] mb-3">Q14. How is internet access at your school? *</p>
+                <div>
+                  <p className="font-semibold text-[#E5E7EB] mb-1">Q14. How is internet access at your school? *</p>
+                  <QuestionTip text="If internet is poor, we will prioritize building an 'Offline Mode' so you can still work without data." />
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {['Excellent', 'Good', 'Fair', 'Poor', 'No internet'].map(opt => (
                       <button key={opt} className={`option-btn ${A.q14 === opt ? 'option-active' : ''}`} onClick={() => setVal('q14', opt)}>{opt}</button>
                     ))}
                   </div>
                 </div>
-                <div><p className="font-semibold text-[#E5E7EB] mb-3">Q15. Do most parents own a smartphone? *</p>
+                <div>
+                  <p className="font-semibold text-[#E5E7EB] mb-1">Q15. Do most parents own a smartphone? *</p>
+                  <QuestionTip text="This tells us if parents would actually use a mobile app to check their children's results." />
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {['Almost all', 'Most (70%+)', 'About half', 'Less than half', 'Very few'].map(opt => (
                       <button key={opt} className={`option-btn ${A.q15 === opt ? 'option-active' : ''}`} onClick={() => setVal('q15', opt)}>{opt}</button>
                     ))}
                   </div>
                 </div>
-                <div><p className="font-semibold text-[#E5E7EB] mb-3">Q16. Have you used school software before? *</p>
+                <div>
+                  <p className="font-semibold text-[#E5E7EB] mb-1">Q16. Have you used school software before? *</p>
+                  <QuestionTip text="Tells us if we are replacing an old system or introducing you to your very first one." />
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                     {['Yes — currently using', 'Yes — tried but stopped', 'No — heard of them', 'No — never considered'].map(opt => (
                       <button key={opt} className={`option-btn ${A.q16 === opt ? 'option-active' : ''}`} onClick={() => setVal('q16', opt)}>{opt}</button>
@@ -360,7 +414,9 @@ export default function DiscoverySurvey() {
                   </div>
                   <textarea className="input-soft h-24 resize-none" placeholder="Q16b. If yes, which one? If no, type N/A *" onChange={e => setVal('q16_desc', e.target.value)} value={A.q16_desc || ''} />
                 </div>
-                <div><p className="font-semibold text-[#E5E7EB] mb-3">Q17. Comfort level with new software? *</p>
+                <div>
+                  <p className="font-semibold text-[#E5E7EB] mb-1">Q17. Comfort level with new software? *</p>
+                  <QuestionTip text="Helps us determine how simple and easy the design needs to be." />
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {['Very comfortable', 'Somewhat comfortable', 'Not very comfortable', 'Prefer paper'].map(opt => (
                       <button key={opt} className={`option-btn ${A.q17 === opt ? 'option-active' : ''}`} onClick={() => setVal('q17', opt)}>{opt}</button>
@@ -377,6 +433,7 @@ export default function DiscoverySurvey() {
               <div className="sec-header"><h2 className="text-xl font-bold text-[#E5E7EB]">Section 04: Feature Priority</h2></div>
               <div className="p-8 space-y-10">
                 <p className="text-xs font-bold text-[#E5C100] uppercase tracking-wider">Rate all features: 1 = Not needed · 5 = Critical *</p>
+                <QuestionTip text="Your ratings decide which features we build first. High ratings for 'Fee Tracking' means we build that before 'Parent Chat'." />
                 {[
                   { section: 'A. Finance', stateKey: 'ratings_finance', items: ['Track debtors', 'Auto SMS fee reminders', 'Generate official receipts', 'Online payments', 'View total fees', 'Track other income', 'Manage staff salaries'] },
                   { section: 'B. Student Mgt', stateKey: 'ratings_student', items: ['Digital bio-data records', 'Academic history', 'Promotions tracking', 'Digital admissions', 'Student photos'] },
@@ -409,42 +466,54 @@ export default function DiscoverySurvey() {
             <div className="animate-in fade-in duration-300">
               <div className="sec-header"><h2 className="text-xl font-bold text-[#E5E7EB]">Section 05: Willingness to Pay</h2></div>
               <div className="p-8 space-y-8">
-                <div><p className="font-semibold text-[#E5E7EB] mb-3">Q18. Monthly budget for full solution? *</p>
+                <div>
+                  <p className="font-semibold text-[#E5E7EB] mb-1">Q18. Monthly budget for full solution? *</p>
+                  <QuestionTip text="Be honest! This helps us set a price that provides value without being a burden." />
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {['Nothing', '₦5,000–₦10,000', '₦10,001–₦20,000', '₦20,001–₦35,000', '₦35,001–₦60,000', 'Above ₦60,000'].map(opt => (
                       <button key={opt} className={`option-btn ${A.q18 === opt ? 'option-active' : ''}`} onClick={() => setVal('q18', opt)}>{opt}</button>
                     ))}
                   </div>
                 </div>
-                <div><p className="font-semibold text-[#E5E7EB] mb-3">Q19. Preferred payment structure? *</p>
+                <div>
+                  <p className="font-semibold text-[#E5E7EB] mb-1">Q19. Preferred payment structure? *</p>
+                  <QuestionTip text="Tells us how you prefer to be billed to match your school fee collection cycle." />
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {['Monthly', 'Per term', 'Annual', 'One-time purchase', 'Free only'].map(opt => (
                       <button key={opt} className={`option-btn ${A.q19 === opt ? 'option-active' : ''}`} onClick={() => setVal('q19', opt)}>{opt}</button>
                     ))}
                   </div>
                 </div>
-                <div><p className="font-semibold text-[#E5E7EB] mb-3">Q20. Would pay more for (Tick all) *</p>
+                <div>
+                  <p className="font-semibold text-[#E5E7EB] mb-1">Q20. Would pay more for (Tick all) *</p>
+                  <QuestionTip text="Which premium features justify an extra cost for your school?" />
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {['Auto SMS', 'AI insights', 'Online portal', 'Dedicated support', 'Parent app', 'Multi-campus'].map(opt => (
                       <button key={opt} className={`option-btn ${A.q20.includes(opt) ? 'option-active' : ''}`} onClick={() => toggleArr('q20', opt)}>{opt}</button>
                     ))}
                   </div>
                 </div>
-                <div><p className="font-semibold text-[#E5E7EB] mb-3">Q21. Dealbreakers / Refusal reasons (Tick all) *</p>
+                <div>
+                  <p className="font-semibold text-[#E5E7EB] mb-1">Q21. Dealbreakers / Refusal reasons (Tick all) *</p>
+                  <QuestionTip text="What would make you say 'NO' to a software? We want to avoid these mistakes." />
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {['Price too high', 'Too complicated', 'Poor internet required', 'Data security', 'Staff resistance', 'Lack of support', 'Unstable'].map(opt => (
                       <button key={opt} className={`option-btn ${A.q21.includes(opt) ? 'option-active' : ''}`} onClick={() => toggleArr('q21', opt)}>{opt}</button>
                     ))}
                   </div>
                 </div>
-                <div><p className="font-semibold text-[#E5E7EB] mb-3">Q22. Current admin spend per month? *</p>
+                <div>
+                  <p className="font-semibold text-[#E5E7EB] mb-1">Q22. Current admin spend per month? *</p>
+                  <QuestionTip text="Helps us understand your current administrative expenses (paper, ink, bulk SMS)." />
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {['Below ₦5k', '₦5k–₦15k', '₦15k–₦30k', '₦30k–₦60k', 'Above ₦60k', 'Never calculated'].map(opt => (
                       <button key={opt} className={`option-btn ${A.q22 === opt ? 'option-active' : ''}`} onClick={() => setVal('q22', opt)}>{opt}</button>
                     ))}
                   </div>
                 </div>
-                <div><p className="font-semibold text-[#E5E7EB] mb-3">Q23. Would you sign up for a free trial? *</p>
+                <div>
+                  <p className="font-semibold text-[#E5E7EB] mb-1">Q23. Would you sign up for a free trial? *</p>
+                  <QuestionTip text="Lets us know if you'd be open to testing the software risk-free when it's ready." />
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {['Yes — definitely', 'Probably yes', 'Maybe', 'Probably not', 'Definitely not'].map(opt => (
                       <button key={opt} className={`option-btn ${A.q23 === opt ? 'option-active' : ''}`} onClick={() => setVal('q23', opt)}>{opt}</button>
@@ -460,16 +529,31 @@ export default function DiscoverySurvey() {
             <div className="animate-in fade-in duration-300">
               <div className="sec-header"><h2 className="text-xl font-bold text-[#E5E7EB]">Section 06: Open Feedback</h2></div>
               <div className="p-8 space-y-6">
-                <div><p className="font-semibold text-[#E5E7EB] mb-2">Q24. Single biggest problem software must solve? *</p>
-                  <textarea className="input-soft h-24 resize-none" onChange={e => setVal('q24', e.target.value)} value={A.q24 || ''} /></div>
-                <div><p className="font-semibold text-[#E5E7EB] mb-2">Q25. Desperate missing feature? *</p>
-                  <textarea className="input-soft h-24 resize-none" onChange={e => setVal('q25', e.target.value)} value={A.q25 || ''} /></div>
-                <div><p className="font-semibold text-[#E5E7EB] mb-2">Q26. Advice to other proprietors before buying? *</p>
-                  <textarea className="input-soft h-24 resize-none" onChange={e => setVal('q26', e.target.value)} value={A.q26 || ''} /></div>
-                <div><p className="font-semibold text-[#E5E7EB] mb-2">Q27. What must be true to sign up on day one? *</p>
-                  <textarea className="input-soft h-24 resize-none" onChange={e => setVal('q27', e.target.value)} value={A.q27 || ''} /></div>
-                <div><p className="font-semibold text-[#E5E7EB] mb-2">Q28. Other comments/concerns? *</p>
-                  <textarea className="input-soft h-24 resize-none" placeholder="Type N/A if none..." onChange={e => setVal('q28', e.target.value)} value={A.q28 || ''} /></div>
+                <div>
+                  <p className="font-semibold text-[#E5E7EB] mb-1">Q24. Single biggest problem software must solve? *</p>
+                  <QuestionTip text="If the software could only do ONE thing perfectly to make your life easier, what would it be?" />
+                  <textarea className="input-soft h-24 resize-none" onChange={e => setVal('q24', e.target.value)} value={A.q24 || ''} />
+                </div>
+                <div>
+                  <p className="font-semibold text-[#E5E7EB] mb-1">Q25. Desperate missing feature? *</p>
+                  <QuestionTip text="What is the one thing existing tools don't do that you wish they did?" />
+                  <textarea className="input-soft h-24 resize-none" onChange={e => setVal('q25', e.target.value)} value={A.q25 || ''} />
+                </div>
+                <div>
+                  <p className="font-semibold text-[#E5E7EB] mb-1">Q26. Advice to other proprietors before buying? *</p>
+                  <QuestionTip text="Help us understand what proprietors really want from software developers." />
+                  <textarea className="input-soft h-24 resize-none" onChange={e => setVal('q26', e.target.value)} value={A.q26 || ''} />
+                </div>
+                <div>
+                  <p className="font-semibold text-[#E5E7EB] mb-1">Q27. What must be true to sign up on day one? *</p>
+                  <QuestionTip text="Tell us the standard you expect. We want to earn your trust from the very first day." />
+                  <textarea className="input-soft h-24 resize-none" onChange={e => setVal('q27', e.target.value)} value={A.q27 || ''} />
+                </div>
+                <div>
+                  <p className="font-semibold text-[#E5E7EB] mb-1">Q28. Other comments/concerns? *</p>
+                  <QuestionTip text="Anything else you want us to keep in mind while building this?" />
+                  <textarea className="input-soft h-24 resize-none" placeholder="Type N/A if none..." onChange={e => setVal('q28', e.target.value)} value={A.q28 || ''} />
+                </div>
               </div>
             </div>
           )}
