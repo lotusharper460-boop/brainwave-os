@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState, Fragment } from 'react'
+import React, { useEffect, useState, Fragment, useCallback } from 'react'
 import { supabase } from '@/utils/supabase/client';
 
 export default function AnalyticsDashboard() {
@@ -18,6 +18,10 @@ export default function AnalyticsDashboard() {
   const [activeTab, setActiveTab] = useState<'analytics' | 'responses' | 'messaging'>('analytics');
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
 
+  // New States for Sorting/Deleting
+  const [roleFilter, setRoleFilter] = useState<string>('All');
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
+
   // Messaging States
   const [messageSubject, setMessageSubject] = useState("Update: Educational Infrastructure Study");
   const [messageBody, setMessageBody] = useState("");
@@ -25,14 +29,9 @@ export default function AnalyticsDashboard() {
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [emailSuccess, setEmailSuccess] = useState(false);
 
-  // Only fetch data AFTER the user is authenticated
-  useEffect(() => {
-    if (isAuthenticated) {
-      fetchData();
-    }
-  }, [isAuthenticated]);
-
-  const fetchData = async () => {
+  // --- STABILIZED FETCH FUNCTION ---
+  // Wrapping in useCallback prevents the infinite loop/hanging
+  const fetchData = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
       .from('research_responses')
@@ -43,7 +42,20 @@ export default function AnalyticsDashboard() {
     else setResponses(data || []);
     
     setLoading(false);
-  };
+  }, []);
+
+  // Only fetch data AFTER the user is authenticated
+  useEffect(() => {
+    let isMounted = true;
+    
+    if (isAuthenticated && isMounted) {
+      fetchData();
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isAuthenticated, fetchData]);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,6 +63,29 @@ export default function AnalyticsDashboard() {
       setIsAuthenticated(true);
     } else {
       setPinError(true);
+    }
+  };
+
+  // --- DELETE FUNCTION ---
+  const handleDeleteResponse = async (id: string) => {
+    if (!window.confirm("Are you sure you want to permanently delete this response?")) return;
+    
+    setIsDeleting(id);
+    try {
+      const { error } = await supabase
+        .from('research_responses')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      
+      // Update the UI by removing the deleted row
+      setResponses(prev => prev.filter(res => res.id !== id));
+      if (expandedRow === id) setExpandedRow(null);
+    } catch (err: any) {
+      alert("Failed to delete response: " + err.message);
+    } finally {
+      setIsDeleting(null);
     }
   };
 
@@ -177,6 +212,14 @@ export default function AnalyticsDashboard() {
       .sort((a, b) => b[1] - a[1]); 
   };
 
+  // --- DERIVE ROLES & FILTER RESPONSES ---
+  const uniqueRoles = Array.from(new Set(responses.map(r => r.role).filter(Boolean)));
+  
+  const displayedResponses = roleFilter === 'All' 
+    ? responses 
+    : responses.filter(r => r.role === roleFilter);
+
+
   // --- UI COMPONENTS FOR CHARTS ---
   const StatBar = ({ label, count }: { label: string, count: number }) => {
     const percentage = total === 0 ? 0 : Math.round((count / total) * 100);
@@ -221,7 +264,6 @@ export default function AnalyticsDashboard() {
       {data.length === 0 ? <p className="text-xs text-[#9CA3AF] italic">No data yet.</p> : data.map(([label, score]) => <FeatureBar key={label} label={label} score={score} />)}
     </div>
   );
-
 
   // ==========================================
   // AUTHENTICATION MODAL (Shown if locked)
@@ -300,7 +342,6 @@ export default function AnalyticsDashboard() {
 
       {/* COMPACT & SCROLLABLE TAB NAVIGATION */}
       <div className="max-w-7xl mx-auto mb-8">
-        {/* Hide scrollbar classes combined with flex-nowrap to allow horizontal swipe on small screens */}
         <div className="flex overflow-x-auto gap-2 border-b border-[#37373A] pb-px [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           <button 
             onClick={() => setActiveTab('analytics')}
@@ -378,9 +419,30 @@ export default function AnalyticsDashboard() {
         </div>
       )}
 
-      {/* VIEW 2: INDIVIDUAL RESPONSES */}
+      {/* VIEW 2: INDIVIDUAL RESPONSES WITH FILTERING & DELETION */}
       {activeTab === 'responses' && (
         <div className="max-w-7xl mx-auto bg-[#242426] border border-[#37373A] rounded-2xl shadow-xl overflow-hidden animate-in fade-in duration-500">
+          
+          {/* THE NEW ROLE FILTER BAR */}
+          <div className="p-5 border-b border-[#37373A] flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[rgba(0,0,0,0.2)]">
+            <div className="flex items-center gap-3">
+              <svg className="w-5 h-5 text-[#00B8CC]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+              </svg>
+              <span className="text-sm font-bold text-[#E5E7EB] uppercase tracking-wider">Filter by Role:</span>
+            </div>
+            <select 
+              value={roleFilter} 
+              onChange={(e) => setRoleFilter(e.target.value)}
+              className="bg-[#1A1A1B] border border-[#37373A] text-sm text-[#E5E7EB] rounded-xl px-4 py-2 outline-none focus:border-[#00B8CC] min-w-[200px]"
+            >
+              <option value="All">All Roles ({responses.length})</option>
+              {uniqueRoles.map(r => (
+                <option key={r} value={r}>{r}</option>
+              ))}
+            </select>
+          </div>
+
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
@@ -388,16 +450,16 @@ export default function AnalyticsDashboard() {
                   <th className="p-5 text-xs font-bold text-[#9CA3AF] uppercase tracking-widest">Date</th>
                   <th className="p-5 text-xs font-bold text-[#9CA3AF] uppercase tracking-widest">School Info</th>
                   <th className="p-5 text-xs font-bold text-[#9CA3AF] uppercase tracking-widest">Contact Details</th>
-                  <th className="p-5 text-xs font-bold text-[#9CA3AF] uppercase tracking-widest">Actions</th>
+                  <th className="p-5 text-xs font-bold text-[#9CA3AF] uppercase tracking-widest text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#37373A]">
                 {loading ? (
                   <tr><td colSpan={4} className="p-10 text-center text-[#9CA3AF] font-bold">Loading secure data...</td></tr>
-                ) : responses.length === 0 ? (
-                  <tr><td colSpan={4} className="p-10 text-center text-[#9CA3AF] font-bold">No research responses found yet.</td></tr>
+                ) : displayedResponses.length === 0 ? (
+                  <tr><td colSpan={4} className="p-10 text-center text-[#9CA3AF] font-bold">No research responses match this filter.</td></tr>
                 ) : (
-                  responses.map((res) => (
+                  displayedResponses.map((res) => (
                     <Fragment key={res.id}>
                       <tr className="hover:bg-[rgba(255,255,255,0.02)] transition-colors">
                         
@@ -419,20 +481,35 @@ export default function AnalyticsDashboard() {
                         </td>
 
                         <td className="p-5 align-top">
-                          <div className="flex flex-col gap-2">
-                            <a href={formatWhatsAppLink(res.phone_number)} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 px-3 py-2 bg-[#25D366]/10 border border-[#25D366]/30 text-[#25D366] rounded-lg hover:bg-[#25D366] hover:text-[#1A1A1B] transition-all font-bold text-[11px] uppercase tracking-wider">
+                          <div className="flex flex-col gap-2 w-32 ml-auto">
+                            
+                            {/* RESTORED WHATSAPP BUTTON */}
+                            <a href={formatWhatsAppLink(res.phone_number)} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center px-3 py-2 bg-[#25D366]/10 border border-[#25D366]/30 text-[#25D366] rounded-lg hover:bg-[#25D366] hover:text-[#1A1A1B] transition-all font-bold text-[11px] uppercase tracking-wider">
                               WhatsApp
                             </a>
                             
-                            <a href={`mailto:${res.email_address}?subject=Educational Infrastructure Study`} className="flex items-center justify-center gap-2 px-3 py-2 bg-[#00B8CC]/10 border border-[#00B8CC]/30 text-[#00B8CC] rounded-lg hover:bg-[#00B8CC] hover:text-[#1A1A1B] transition-all font-bold text-[11px] uppercase tracking-wider">
+                            {/* RESTORED INDIVIDUAL EMAIL BUTTON */}
+                            <a href={`mailto:${res.email_address}?subject=Educational Infrastructure Study`} className="flex items-center justify-center px-3 py-2 bg-[#00B8CC]/10 border border-[#00B8CC]/30 text-[#00B8CC] rounded-lg hover:bg-[#00B8CC] hover:text-[#1A1A1B] transition-all font-bold text-[11px] uppercase tracking-wider">
                               Email
                             </a>
+
+                            {/* VIEW DATA BUTTON */}
                             <button 
                               onClick={() => setExpandedRow(expandedRow === res.id ? null : res.id)}
-                              className="flex items-center justify-center gap-2 px-3 py-2 bg-[#E5C100]/10 border border-[#E5C100]/30 text-[#E5C100] rounded-lg hover:bg-[#E5C100] hover:text-[#1A1A1B] transition-all font-bold text-[11px] uppercase tracking-wider mt-1"
+                              className="flex items-center justify-center px-3 py-2 bg-[#E5C100]/10 border border-[#E5C100]/30 text-[#E5C100] rounded-lg hover:bg-[#E5C100] hover:text-[#1A1A1B] transition-all font-bold text-[11px] uppercase tracking-wider"
                             >
-                              {expandedRow === res.id ? 'Close Feedback' : 'View Feedback'}
+                              {expandedRow === res.id ? 'Close' : 'View Data'}
                             </button>
+
+                            {/* SECURE DELETE BUTTON */}
+                            <button 
+                              onClick={() => handleDeleteResponse(res.id)}
+                              disabled={isDeleting === res.id}
+                              className={`flex items-center justify-center px-3 py-2 rounded-lg transition-all font-bold text-[11px] uppercase tracking-wider border ${isDeleting === res.id ? 'bg-[#37373A] text-[#9CA3AF] border-transparent' : 'bg-red-500/10 border-red-500/30 text-red-500 hover:bg-red-500 hover:text-white'}`}
+                            >
+                              {isDeleting === res.id ? 'Deleting...' : 'Delete'}
+                            </button>
+
                           </div>
                         </td>
                       </tr>
@@ -462,7 +539,6 @@ export default function AnalyticsDashboard() {
       {/* VIEW 3: DIRECT BULK MESSAGING */}
       {activeTab === 'messaging' && (
         <div className="max-w-4xl mx-auto animate-in fade-in duration-500">
-          
           <div className="bg-[#242426] border border-[#37373A] rounded-2xl p-8 shadow-xl">
             <div className="flex items-center gap-4 mb-8 pb-4 border-b border-[#37373A]">
               <div className="w-12 h-12 rounded-full bg-[rgba(229,193,0,0.1)] border border-[#E5C100]/30 flex items-center justify-center">
@@ -483,7 +559,6 @@ export default function AnalyticsDashboard() {
               </div>
             )}
 
-            {/* List of Numbers */}
             <div className="mb-8 p-5 bg-[#1A1A1B] border border-[#37373A] rounded-xl">
                <h3 className="text-sm font-bold text-[#E5C100] mb-2">Collected Phone Numbers (Ready for Bulk Copy)</h3>
                <textarea 
@@ -499,7 +574,6 @@ export default function AnalyticsDashboard() {
                 </button>
             </div>
 
-            {/* COMPOSE MESSAGE */}
             <div className="space-y-6 pt-6 border-t border-[#37373A]">
               <h3 className="text-sm font-bold text-[#00B8CC] mb-2 flex items-center gap-2">
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -534,7 +608,6 @@ export default function AnalyticsDashboard() {
                 {isSendingEmail ? 'Sending via Server...' : `Send Email to ${total} Users`}
               </button>
             </div>
-
           </div>
         </div>
       )}
