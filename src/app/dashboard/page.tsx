@@ -211,24 +211,26 @@ export default function AnalyticsDashboard() {
     if (total === 0) return null;
 
     // 1. Monetization Viability
-    const paying = responses.filter(r => r.q18_willing_to_pay && r.q18_willing_to_pay !== 'Nothing');
+    const paying = responses.filter((r: any) => r.q18_willing_to_pay && r.q18_willing_to_pay !== 'Nothing');
     const payPercent = Math.round((paying.length / total) * 100);
 
     // 2. Biggest Dealbreaker
     const dealbreakers: Record<string, number> = {};
-    responses.forEach(r => {
+    responses.forEach((r: any) => {
       if (Array.isArray(r.q21_refuse_to_pay_reasons)) {
-        r.q21_refuse_to_pay_reasons.forEach(d => { dealbreakers[d] = (dealbreakers[d] || 0) + 1; });
+        r.q21_refuse_to_pay_reasons.forEach((d: string) => { 
+          dealbreakers[d] = (dealbreakers[d] || 0) + 1; 
+        });
       }
     });
     const topDealbreaker = Object.entries(dealbreakers).sort((a, b) => b[1] - a[1])[0];
 
     // 3. Number 1 Feature Request
     const allFeats: Record<string, { sum: number, count: number }> = {};
-    responses.forEach(r => {
-      ['feature_finance', 'feature_student', 'feature_attendance', 'feature_academic', 'feature_communication', 'feature_analytics'].forEach(cat => {
+    responses.forEach((r: any) => {
+      ['feature_finance', 'feature_student', 'feature_attendance', 'feature_academic', 'feature_communication', 'feature_analytics'].forEach((cat: string) => {
         if (r[cat] && typeof r[cat] === 'object') {
-          Object.entries(r[cat]).forEach(([feat, val]) => {
+          Object.entries(r[cat]).forEach(([feat, val]: [string, any]) => {
             if (typeof val === 'number') {
               if (!allFeats[feat]) allFeats[feat] = { sum: 0, count: 0 };
               allFeats[feat].sum += val;
@@ -239,14 +241,14 @@ export default function AnalyticsDashboard() {
       });
     });
     const topFeat = Object.entries(allFeats)
-      .map(([name, stats]) => ({ name, avg: stats.sum / stats.count }))
+      .map(([name, stats]: [string, any]) => ({ name, avg: stats.sum / stats.count }))
       .sort((a, b) => b.avg - a.avg)[0];
 
     // 4. Core Operational Challenge
     const topChallenges: Record<string, number> = {};
-    responses.forEach(r => {
+    responses.forEach((r: any) => {
       if (r.q10_top_challenges && typeof r.q10_top_challenges === 'object') {
-         Object.keys(r.q10_top_challenges).forEach(ch => {
+         Object.keys(r.q10_top_challenges).forEach((ch: string) => {
            topChallenges[ch] = (topChallenges[ch] || 0) + 1;
          })
       }
@@ -254,7 +256,7 @@ export default function AnalyticsDashboard() {
     const topChallenge = Object.entries(topChallenges).sort((a,b) => b[1] - a[1])[0];
 
     // 5. Tech Readiness Danger
-    const techIssues = responses.filter(r => r.q14_internet_access === 'Poor' || r.q14_internet_access === 'No internet');
+    const techIssues = responses.filter((r: any) => r.q14_internet_access === 'Poor' || r.q14_internet_access === 'No internet');
     const offlineNeedPercent = Math.round((techIssues.length / total) * 100);
 
     return { payPercent, topDealbreaker, topFeat, topChallenge, offlineNeedPercent };
@@ -422,12 +424,10 @@ export default function AnalyticsDashboard() {
         </div>
       </div>
 
-      {/* --- NEW VIEW: AI INSIGHTS --- */}
+      {/* --- TAB 1: AI INSIGHTS --- */}
       {activeTab === 'insights' && (
         <div className="max-w-4xl mx-auto animate-in fade-in zoom-in-95 duration-500">
           <div className="bg-gradient-to-br from-[#1A1A1B] to-[#2d1b4d]/40 border border-[#B562FF]/40 rounded-2xl p-8 shadow-[0_0_30px_rgba(181,98,255,0.1)] relative overflow-hidden">
-            
-            {/* Background Glow */}
             <div className="absolute -top-20 -right-20 w-64 h-64 bg-[#B562FF]/10 blur-[60px] rounded-full pointer-events-none" />
 
             <div className="flex items-center gap-4 mb-8 pb-4 border-b border-[#37373A] relative z-10">
@@ -446,8 +446,6 @@ export default function AnalyticsDashboard() {
               <p className="text-center text-[#9CA3AF] py-10 font-bold">Waiting for survey data to run synthesis...</p>
             ) : (
               <div className="space-y-6 relative z-10">
-                
-                {/* Insight 1: Monetization */}
                 <div className="bg-[#1A1A1B]/80 backdrop-blur-md p-6 rounded-xl border border-[#37373A]">
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="text-sm font-black text-[#B562FF] uppercase tracking-widest">1. Market Viability</h3>
@@ -458,7 +456,6 @@ export default function AnalyticsDashboard() {
                   </p>
                 </div>
 
-                {/* Insight 2: Feature Roadmap */}
                 <div className="bg-[#1A1A1B]/80 backdrop-blur-md p-6 rounded-xl border border-[#37373A]">
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="text-sm font-black text-[#B562FF] uppercase tracking-widest">2. Development Roadmap</h3>
@@ -469,7 +466,6 @@ export default function AnalyticsDashboard() {
                   </p>
                 </div>
 
-                {/* Insight 3: Core Problem */}
                 <div className="bg-[#1A1A1B]/80 backdrop-blur-md p-6 rounded-xl border border-[#37373A]">
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="text-sm font-black text-[#B562FF] uppercase tracking-widest">3. Primary Pain Point</h3>
@@ -480,7 +476,6 @@ export default function AnalyticsDashboard() {
                   </p>
                 </div>
 
-                {/* Insight 4: Churn Risk */}
                 <div className="bg-[#1A1A1B]/80 backdrop-blur-md p-6 rounded-xl border border-red-500/30">
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="text-sm font-black text-[#B562FF] uppercase tracking-widest">4. Critical Risk / Dealbreaker</h3>
@@ -490,14 +485,13 @@ export default function AnalyticsDashboard() {
                     The most common reason schools will refuse to use your software is <strong className="text-white">"{insights?.topDealbreaker?.[0]}"</strong> (cited by {insights?.topDealbreaker?.[1]} schools). Furthermore, <strong className="text-white">{insights?.offlineNeedPercent}% of respondents</strong> report having poor or no internet. If your app isn't fast and offline-capable, they will churn.
                   </p>
                 </div>
-
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* VIEW 1: DATA ANALYTICS */}
+      {/* --- TAB 2: DATA ANALYTICS --- */}
       {activeTab === 'analytics' && (
         <div className="max-w-7xl mx-auto animate-in fade-in duration-500">
           <h2 className="text-lg font-bold mb-4 text-[#E5E7EB]">1. School Demographics</h2>
@@ -549,7 +543,7 @@ export default function AnalyticsDashboard() {
         </div>
       )}
 
-      {/* VIEW 2: INDIVIDUAL RESPONSES */}
+      {/* --- TAB 3: INDIVIDUAL RESPONSES --- */}
       {activeTab === 'responses' && (
         <div className="max-w-7xl mx-auto bg-[#242426] border border-[#37373A] rounded-2xl shadow-xl overflow-hidden animate-in fade-in duration-500">
           
@@ -640,7 +634,6 @@ export default function AnalyticsDashboard() {
                           <td colSpan={4} className="p-0 border-b-2 border-[#00B8CC]">
                             <div className="p-6 sm:p-10 space-y-8">
                               
-                              {/* Header & Close Button */}
                               <div className="flex justify-between items-center border-b border-[#37373A] pb-4">
                                 <div>
                                   <h4 className="text-lg font-black text-[#E5E7EB]">Full Respondent Profile</h4>
@@ -654,10 +647,8 @@ export default function AnalyticsDashboard() {
                                 </button>
                               </div>
 
-                              {/* Data Grid Layout - 3 Columns */}
                               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                
-                                {/* COLUMN 1: Profile & Tech */}
+                                {/* COLUMN 1 */}
                                 <div className="space-y-6">
                                   <div className="bg-[#1A1A1B] p-5 rounded-xl border border-[#37373A]">
                                     <h5 className="text-xs font-bold text-[#00B8CC] uppercase tracking-widest mb-4 border-b border-[#37373A] pb-2">School Demographics</h5>
@@ -684,7 +675,7 @@ export default function AnalyticsDashboard() {
                                   </div>
                                 </div>
 
-                                {/* COLUMN 2: Operations & Pricing */}
+                                {/* COLUMN 2 */}
                                 <div className="space-y-6">
                                   <div className="bg-[#1A1A1B] p-5 rounded-xl border border-[#37373A]">
                                     <h5 className="text-xs font-bold text-[#00B8CC] uppercase tracking-widest mb-4 border-b border-[#37373A] pb-2">Daily Operations</h5>
@@ -711,7 +702,7 @@ export default function AnalyticsDashboard() {
                                   </div>
                                 </div>
 
-                                {/* COLUMN 3: Rankings & Feature Ratings */}
+                                {/* COLUMN 3 */}
                                 <div className="space-y-6">
                                   <div className="bg-[#1A1A1B] p-5 rounded-xl border border-[#37373A]">
                                     <h5 className="text-xs font-bold text-[#E5C100] uppercase tracking-widest mb-4 border-b border-[#37373A] pb-2">Q10. Top Admin Challenges (Ranked)</h5>
@@ -799,7 +790,7 @@ export default function AnalyticsDashboard() {
         </div>
       )}
 
-      {/* VIEW 4: DIRECT BULK MESSAGING */}
+      {/* --- TAB 4: DIRECT BULK MESSAGING --- */}
       {activeTab === 'messaging' && (
         <div className="max-w-4xl mx-auto animate-in fade-in duration-500">
           <div className="bg-[#242426] border border-[#37373A] rounded-2xl p-8 shadow-xl">
