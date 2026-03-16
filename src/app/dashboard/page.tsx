@@ -15,7 +15,7 @@ export default function AnalyticsDashboard() {
   const [responses, setResponses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
-  const [activeTab, setActiveTab] = useState<'analytics' | 'responses' | 'messaging'>('analytics');
+  const [activeTab, setActiveTab] = useState<'analytics' | 'responses' | 'messaging' | 'insights'>('analytics');
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
 
   // New States for Sorting/Deleting
@@ -30,7 +30,6 @@ export default function AnalyticsDashboard() {
   const [emailSuccess, setEmailSuccess] = useState(false);
 
   // --- STABILIZED FETCH FUNCTION ---
-  // Wrapping in useCallback prevents the infinite loop/hanging
   const fetchData = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
@@ -47,14 +46,10 @@ export default function AnalyticsDashboard() {
   // Only fetch data AFTER the user is authenticated
   useEffect(() => {
     let isMounted = true;
-    
     if (isAuthenticated && isMounted) {
       fetchData();
     }
-
-    return () => {
-      isMounted = false;
-    };
+    return () => { isMounted = false; };
   }, [isAuthenticated, fetchData]);
 
   const handleLogin = (e: React.FormEvent) => {
@@ -79,7 +74,6 @@ export default function AnalyticsDashboard() {
 
       if (error) throw error;
       
-      // Update the UI by removing the deleted row
       setResponses(prev => prev.filter(res => res.id !== id));
       if (expandedRow === id) setExpandedRow(null);
     } catch (err: any) {
@@ -155,7 +149,7 @@ export default function AnalyticsDashboard() {
     setIsSendingEmail(false);
   };
 
-  // --- ANALYTICS ENGINE ---
+  // --- ANALYTICS ENGINE (Charts) ---
   const total = responses.length;
 
   const getFrequencies = (key: string) => {
@@ -212,13 +206,64 @@ export default function AnalyticsDashboard() {
       .sort((a, b) => b[1] - a[1]); 
   };
 
+  // --- LOCAL AI HEURISTICS ENGINE ---
+  const generateInsights = () => {
+    if (total === 0) return null;
+
+    // 1. Monetization Viability
+    const paying = responses.filter(r => r.q18_willing_to_pay && r.q18_willing_to_pay !== 'Nothing');
+    const payPercent = Math.round((paying.length / total) * 100);
+
+    // 2. Biggest Dealbreaker
+    const dealbreakers: Record<string, number> = {};
+    responses.forEach(r => {
+      if (Array.isArray(r.q21_refuse_to_pay_reasons)) {
+        r.q21_refuse_to_pay_reasons.forEach(d => { dealbreakers[d] = (dealbreakers[d] || 0) + 1; });
+      }
+    });
+    const topDealbreaker = Object.entries(dealbreakers).sort((a, b) => b[1] - a[1])[0];
+
+    // 3. Number 1 Feature Request
+    const allFeats: Record<string, { sum: number, count: number }> = {};
+    responses.forEach(r => {
+      ['feature_finance', 'feature_student', 'feature_attendance', 'feature_academic', 'feature_communication', 'feature_analytics'].forEach(cat => {
+        if (r[cat] && typeof r[cat] === 'object') {
+          Object.entries(r[cat]).forEach(([feat, val]) => {
+            if (typeof val === 'number') {
+              if (!allFeats[feat]) allFeats[feat] = { sum: 0, count: 0 };
+              allFeats[feat].sum += val;
+              allFeats[feat].count += 1;
+            }
+          });
+        }
+      });
+    });
+    const topFeat = Object.entries(allFeats)
+      .map(([name, stats]) => ({ name, avg: stats.sum / stats.count }))
+      .sort((a, b) => b.avg - a.avg)[0];
+
+    // 4. Core Operational Challenge
+    const topChallenges: Record<string, number> = {};
+    responses.forEach(r => {
+      if (r.q10_top_challenges && typeof r.q10_top_challenges === 'object') {
+         Object.keys(r.q10_top_challenges).forEach(ch => {
+           topChallenges[ch] = (topChallenges[ch] || 0) + 1;
+         })
+      }
+    });
+    const topChallenge = Object.entries(topChallenges).sort((a,b) => b[1] - a[1])[0];
+
+    // 5. Tech Readiness Danger
+    const techIssues = responses.filter(r => r.q14_internet_access === 'Poor' || r.q14_internet_access === 'No internet');
+    const offlineNeedPercent = Math.round((techIssues.length / total) * 100);
+
+    return { payPercent, topDealbreaker, topFeat, topChallenge, offlineNeedPercent };
+  };
+  const insights = generateInsights();
+
   // --- DERIVE ROLES & FILTER RESPONSES ---
   const uniqueRoles = Array.from(new Set(responses.map(r => r.role).filter(Boolean)));
-  
-  const displayedResponses = roleFilter === 'All' 
-    ? responses 
-    : responses.filter(r => r.role === roleFilter);
-
+  const displayedResponses = roleFilter === 'All' ? responses : responses.filter(r => r.role === roleFilter);
 
   // --- UI COMPONENTS FOR CHARTS ---
   const StatBar = ({ label, count }: { label: string, count: number }) => {
@@ -266,7 +311,7 @@ export default function AnalyticsDashboard() {
   );
 
   // ==========================================
-  // AUTHENTICATION MODAL (Shown if locked)
+  // AUTHENTICATION MODAL
   // ==========================================
   if (!isAuthenticated) {
     return (
@@ -309,7 +354,7 @@ export default function AnalyticsDashboard() {
   }
 
   // ==========================================
-  // MAIN DASHBOARD (Shown if authenticated)
+  // MAIN DASHBOARD
   // ==========================================
   return (
     <main className="min-h-screen bg-[#1A1A1B] text-[#E5E7EB] p-4 sm:p-8 font-sans pb-32">
@@ -340,7 +385,7 @@ export default function AnalyticsDashboard() {
         </div>
       )}
 
-      {/* COMPACT & SCROLLABLE TAB NAVIGATION */}
+      {/* TAB NAVIGATION */}
       <div className="max-w-7xl mx-auto mb-8">
         <div className="flex overflow-x-auto gap-2 border-b border-[#37373A] pb-px [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           <button 
@@ -349,12 +394,22 @@ export default function AnalyticsDashboard() {
           >
             Data Analytics
           </button>
+          
+          <button 
+            onClick={() => setActiveTab('insights')}
+            className={`shrink-0 px-4 py-2.5 font-bold text-xs rounded-t-xl transition-all flex items-center gap-1.5 ${activeTab === 'insights' ? 'bg-[#242426] text-[#B562FF] border-t border-l border-r border-[#37373A]' : 'text-[#9CA3AF] hover:text-[#B562FF]'}`}
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+            AI Synthesis
+          </button>
+
           <button 
             onClick={() => setActiveTab('responses')}
             className={`shrink-0 px-4 py-2.5 font-bold text-xs rounded-t-xl transition-all ${activeTab === 'responses' ? 'bg-[#242426] text-[#00B8CC] border-t border-l border-r border-[#37373A]' : 'text-[#9CA3AF] hover:text-[#E5E7EB]'}`}
           >
             Individual Responses
           </button>
+
           <button 
             onClick={() => setActiveTab('messaging')}
             className={`shrink-0 px-4 py-2.5 font-bold text-xs rounded-t-xl transition-all flex items-center gap-1.5 ${activeTab === 'messaging' ? 'bg-[#242426] text-[#E5C100] border-t border-l border-r border-[#37373A]' : 'text-[#9CA3AF] hover:text-[#E5C100]'}`}
@@ -366,6 +421,81 @@ export default function AnalyticsDashboard() {
           </button>
         </div>
       </div>
+
+      {/* --- NEW VIEW: AI INSIGHTS --- */}
+      {activeTab === 'insights' && (
+        <div className="max-w-4xl mx-auto animate-in fade-in zoom-in-95 duration-500">
+          <div className="bg-gradient-to-br from-[#1A1A1B] to-[#2d1b4d]/40 border border-[#B562FF]/40 rounded-2xl p-8 shadow-[0_0_30px_rgba(181,98,255,0.1)] relative overflow-hidden">
+            
+            {/* Background Glow */}
+            <div className="absolute -top-20 -right-20 w-64 h-64 bg-[#B562FF]/10 blur-[60px] rounded-full pointer-events-none" />
+
+            <div className="flex items-center gap-4 mb-8 pb-4 border-b border-[#37373A] relative z-10">
+              <div className="w-12 h-12 rounded-full bg-[#B562FF]/20 border border-[#B562FF]/50 flex items-center justify-center">
+                <svg className="w-6 h-6 text-[#B562FF]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-[#E5E7EB]">Automated Strategy Report</h2>
+                <p className="text-sm text-[#9CA3AF]">Synthesized from <span className="text-[#B562FF] font-bold">{total} data points</span> using local heuristics.</p>
+              </div>
+            </div>
+
+            {total === 0 ? (
+              <p className="text-center text-[#9CA3AF] py-10 font-bold">Waiting for survey data to run synthesis...</p>
+            ) : (
+              <div className="space-y-6 relative z-10">
+                
+                {/* Insight 1: Monetization */}
+                <div className="bg-[#1A1A1B]/80 backdrop-blur-md p-6 rounded-xl border border-[#37373A]">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-black text-[#B562FF] uppercase tracking-widest">1. Market Viability</h3>
+                    <span className="px-3 py-1 bg-[#00D06C]/20 text-[#00D06C] rounded-full text-xs font-bold">{insights?.payPercent}% Conversion Rate</span>
+                  </div>
+                  <p className="text-sm text-[#E5E7EB] leading-relaxed">
+                    Based on responses, <strong className="text-white">{insights?.payPercent}% of schools</strong> are willing to pay for this software right now. If you launch today, this is your immediate addressable market.
+                  </p>
+                </div>
+
+                {/* Insight 2: Feature Roadmap */}
+                <div className="bg-[#1A1A1B]/80 backdrop-blur-md p-6 rounded-xl border border-[#37373A]">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-black text-[#B562FF] uppercase tracking-widest">2. Development Roadmap</h3>
+                    <span className="px-3 py-1 bg-[#00B8CC]/20 text-[#00B8CC] rounded-full text-xs font-bold">Priority #1</span>
+                  </div>
+                  <p className="text-sm text-[#E5E7EB] leading-relaxed">
+                    The highest-rated feature requested by schools is <strong className="text-white">"{insights?.topFeat?.name}"</strong>, with an average urgency score of <strong className="text-[#E5C100]">{insights?.topFeat?.avg?.toFixed(1)} / 5.0</strong>. You should prioritize building this module before anything else.
+                  </p>
+                </div>
+
+                {/* Insight 3: Core Problem */}
+                <div className="bg-[#1A1A1B]/80 backdrop-blur-md p-6 rounded-xl border border-[#37373A]">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-black text-[#B562FF] uppercase tracking-widest">3. Primary Pain Point</h3>
+                    <span className="px-3 py-1 bg-[#E5C100]/20 text-[#E5C100] rounded-full text-xs font-bold">Core Problem</span>
+                  </div>
+                  <p className="text-sm text-[#E5E7EB] leading-relaxed">
+                    When forced to rank their challenges, <strong className="text-white">"{insights?.topChallenge?.[0]}"</strong> was consistently ranked as the most severe issue across the schools. Your landing page marketing copy should explicitly promise to solve this specific problem.
+                  </p>
+                </div>
+
+                {/* Insight 4: Churn Risk */}
+                <div className="bg-[#1A1A1B]/80 backdrop-blur-md p-6 rounded-xl border border-red-500/30">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-black text-[#B562FF] uppercase tracking-widest">4. Critical Risk / Dealbreaker</h3>
+                    <span className="px-3 py-1 bg-red-500/20 text-red-400 rounded-full text-xs font-bold">Warning</span>
+                  </div>
+                  <p className="text-sm text-[#E5E7EB] leading-relaxed">
+                    The most common reason schools will refuse to use your software is <strong className="text-white">"{insights?.topDealbreaker?.[0]}"</strong> (cited by {insights?.topDealbreaker?.[1]} schools). Furthermore, <strong className="text-white">{insights?.offlineNeedPercent}% of respondents</strong> report having poor or no internet. If your app isn't fast and offline-capable, they will churn.
+                  </p>
+                </div>
+
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* VIEW 1: DATA ANALYTICS */}
       {activeTab === 'analytics' && (
@@ -419,11 +549,10 @@ export default function AnalyticsDashboard() {
         </div>
       )}
 
-      {/* VIEW 2: INDIVIDUAL RESPONSES WITH FILTERING & DELETION */}
+      {/* VIEW 2: INDIVIDUAL RESPONSES */}
       {activeTab === 'responses' && (
         <div className="max-w-7xl mx-auto bg-[#242426] border border-[#37373A] rounded-2xl shadow-xl overflow-hidden animate-in fade-in duration-500">
           
-          {/* THE NEW ROLE FILTER BAR */}
           <div className="p-5 border-b border-[#37373A] flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[rgba(0,0,0,0.2)]">
             <div className="flex items-center gap-3">
               <svg className="w-5 h-5 text-[#00B8CC]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -482,26 +611,18 @@ export default function AnalyticsDashboard() {
 
                         <td className="p-5 align-top">
                           <div className="flex flex-col gap-2 w-32 ml-auto">
-                            
-                            {/* RESTORED WHATSAPP BUTTON */}
                             <a href={formatWhatsAppLink(res.phone_number)} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center px-3 py-2 bg-[#25D366]/10 border border-[#25D366]/30 text-[#25D366] rounded-lg hover:bg-[#25D366] hover:text-[#1A1A1B] transition-all font-bold text-[11px] uppercase tracking-wider">
                               WhatsApp
                             </a>
-                            
-                            {/* RESTORED INDIVIDUAL EMAIL BUTTON */}
                             <a href={`mailto:${res.email_address}?subject=Educational Infrastructure Study`} className="flex items-center justify-center px-3 py-2 bg-[#00B8CC]/10 border border-[#00B8CC]/30 text-[#00B8CC] rounded-lg hover:bg-[#00B8CC] hover:text-[#1A1A1B] transition-all font-bold text-[11px] uppercase tracking-wider">
                               Email
                             </a>
-
-                            {/* VIEW DATA BUTTON */}
                             <button 
                               onClick={() => setExpandedRow(expandedRow === res.id ? null : res.id)}
                               className="flex items-center justify-center px-3 py-2 bg-[#E5C100]/10 border border-[#E5C100]/30 text-[#E5C100] rounded-lg hover:bg-[#E5C100] hover:text-[#1A1A1B] transition-all font-bold text-[11px] uppercase tracking-wider"
                             >
                               {expandedRow === res.id ? 'Close' : 'View Data'}
                             </button>
-
-                            {/* SECURE DELETE BUTTON */}
                             <button 
                               onClick={() => handleDeleteResponse(res.id)}
                               disabled={isDeleting === res.id}
@@ -509,20 +630,162 @@ export default function AnalyticsDashboard() {
                             >
                               {isDeleting === res.id ? 'Deleting...' : 'Delete'}
                             </button>
-
                           </div>
                         </td>
                       </tr>
 
+                      {/* --- FULL 100% DATA BENTO LAYOUT FOR INDIVIDUAL RESPONSE --- */}
                       {expandedRow === res.id && (
-                        <tr className="bg-[#1A1A1B] animate-in fade-in slide-in-from-top-2 duration-300">
-                          <td colSpan={4} className="p-8 border-b-2 border-[#00B8CC]">
-                            <h4 className="text-sm font-black text-[#00B8CC] uppercase tracking-widest mb-6 border-b border-[#37373A] pb-2">Open Text Responses</h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                              <div><p className="text-xs font-bold text-[#9CA3AF] uppercase mb-1">Q24. Biggest problem?</p><p className="text-sm text-[#E5E7EB] bg-[#242426] p-4 rounded-xl border border-[#37373A]">{res.q24_biggest_problem || 'N/A'}</p></div>
-                              <div><p className="text-xs font-bold text-[#9CA3AF] uppercase mb-1">Q25. Desperate missing feature?</p><p className="text-sm text-[#E5E7EB] bg-[#242426] p-4 rounded-xl border border-[#37373A]">{res.q25_desperate_feature || 'N/A'}</p></div>
-                              <div><p className="text-xs font-bold text-[#9CA3AF] uppercase mb-1">Q26. Advice before buying?</p><p className="text-sm text-[#E5E7EB] bg-[#242426] p-4 rounded-xl border border-[#37373A]">{res.q26_advice_to_proprietors || 'N/A'}</p></div>
-                              <div><p className="text-xs font-bold text-[#9CA3AF] uppercase mb-1">Q27. Requirement for day one?</p><p className="text-sm text-[#E5E7EB] bg-[#242426] p-4 rounded-xl border border-[#37373A]">{res.q27_launch_day_requirement || 'N/A'}</p></div>
+                        <tr className="bg-[#121212] animate-in fade-in slide-in-from-top-2 duration-300 shadow-inner">
+                          <td colSpan={4} className="p-0 border-b-2 border-[#00B8CC]">
+                            <div className="p-6 sm:p-10 space-y-8">
+                              
+                              {/* Header & Close Button */}
+                              <div className="flex justify-between items-center border-b border-[#37373A] pb-4">
+                                <div>
+                                  <h4 className="text-lg font-black text-[#E5E7EB]">Full Respondent Profile</h4>
+                                  <p className="text-xs text-[#9CA3AF] mt-1">Submitted on {new Date(res.created_at).toLocaleString()}</p>
+                                </div>
+                                <button 
+                                  onClick={() => setExpandedRow(null)}
+                                  className="px-4 py-2 bg-[#242426] border border-[#37373A] rounded-lg text-xs font-bold text-[#9CA3AF] hover:text-white hover:border-[#00B8CC] transition-all"
+                                >
+                                  Close View
+                                </button>
+                              </div>
+
+                              {/* Data Grid Layout - 3 Columns */}
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                
+                                {/* COLUMN 1: Profile & Tech */}
+                                <div className="space-y-6">
+                                  <div className="bg-[#1A1A1B] p-5 rounded-xl border border-[#37373A]">
+                                    <h5 className="text-xs font-bold text-[#00B8CC] uppercase tracking-widest mb-4 border-b border-[#37373A] pb-2">School Demographics</h5>
+                                    <div className="space-y-3">
+                                      <div><p className="text-[10px] text-[#9CA3AF] uppercase font-bold">Q1. Enrollment</p><p className="text-sm text-[#E5E7EB]">{res.q1_enrollment || 'N/A'}</p></div>
+                                      <div><p className="text-[10px] text-[#9CA3AF] uppercase font-bold">Q2. Levels Offered</p><p className="text-sm text-[#E5E7EB]">{Array.isArray(res.q2_levels_offered) ? res.q2_levels_offered.join(', ') : 'N/A'}</p></div>
+                                      <div><p className="text-[10px] text-[#9CA3AF] uppercase font-bold">Q3. Staff Count</p><p className="text-sm text-[#E5E7EB]">{res.q3_staff_count || 'N/A'}</p></div>
+                                      <div><p className="text-[10px] text-[#9CA3AF] uppercase font-bold">Q4. Class Count</p><p className="text-sm text-[#E5E7EB]">{res.q4_class_count || 'N/A'}</p></div>
+                                      <div><p className="text-[10px] text-[#9CA3AF] uppercase font-bold">Q5. Avg Fee/Term</p><p className="text-sm text-[#E5E7EB]">{res.q5_average_fee || 'N/A'}</p></div>
+                                      <div><p className="text-[10px] text-[#9CA3AF] uppercase font-bold">Q6. City / Area</p><p className="text-sm text-[#E5E7EB]">{res.q6_city_area || 'N/A'}</p></div>
+                                    </div>
+                                  </div>
+
+                                  <div className="bg-[#1A1A1B] p-5 rounded-xl border border-[#37373A]">
+                                    <h5 className="text-xs font-bold text-[#00B8CC] uppercase tracking-widest mb-4 border-b border-[#37373A] pb-2">Tech Readiness</h5>
+                                    <div className="space-y-3">
+                                      <div><p className="text-[10px] text-[#9CA3AF] uppercase font-bold">Q13. Devices Used</p><p className="text-sm text-[#E5E7EB]">{Array.isArray(res.q13_devices_used) ? res.q13_devices_used.join(', ') : 'N/A'}</p></div>
+                                      <div><p className="text-[10px] text-[#9CA3AF] uppercase font-bold">Q14. Internet Access</p><p className="text-sm text-[#E5E7EB]">{res.q14_internet_access || 'N/A'}</p></div>
+                                      <div><p className="text-[10px] text-[#9CA3AF] uppercase font-bold">Q15. Parent Smartphones</p><p className="text-sm text-[#E5E7EB]">{res.q15_parent_smartphones || 'N/A'}</p></div>
+                                      <div><p className="text-[10px] text-[#9CA3AF] uppercase font-bold">Q16. Used Software Before?</p><p className="text-sm text-[#E5E7EB]">{res.q16_used_software_before || 'N/A'}</p></div>
+                                      {res.q16b_software_feedback && <div><p className="text-[10px] text-[#9CA3AF] uppercase font-bold">Q16b. Software Notes</p><p className="text-sm text-[#E5C100] italic">{res.q16b_software_feedback}</p></div>}
+                                      <div><p className="text-[10px] text-[#9CA3AF] uppercase font-bold">Q17. Personal Tech Comfort</p><p className="text-sm text-[#E5E7EB]">{res.q17_personal_tech_comfort || 'N/A'}</p></div>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* COLUMN 2: Operations & Pricing */}
+                                <div className="space-y-6">
+                                  <div className="bg-[#1A1A1B] p-5 rounded-xl border border-[#37373A]">
+                                    <h5 className="text-xs font-bold text-[#00B8CC] uppercase tracking-widest mb-4 border-b border-[#37373A] pb-2">Daily Operations</h5>
+                                    <div className="space-y-3">
+                                      <div><p className="text-[10px] text-[#9CA3AF] uppercase font-bold">Q7. Manage Records</p><p className="text-sm text-[#E5E7EB]">{Array.isArray(res.q7_manage_records) ? res.q7_manage_records.join(', ') : 'N/A'}</p></div>
+                                      <div><p className="text-[10px] text-[#9CA3AF] uppercase font-bold">Q8. Track Fees</p><p className="text-sm text-[#E5E7EB]">{Array.isArray(res.q8_track_fees) ? res.q8_track_fees.join(', ') : 'N/A'}</p></div>
+                                      <div><p className="text-[10px] text-[#9CA3AF] uppercase font-bold">Q9. Take Attendance</p><p className="text-sm text-[#E5E7EB]">{Array.isArray(res.q9_take_attendance) ? res.q9_take_attendance.join(', ') : 'N/A'}</p></div>
+                                      <div><p className="text-[10px] text-[#9CA3AF] uppercase font-bold">Q11. Admin Time/Week</p><p className="text-sm text-[#E5E7EB]">{res.q11_admin_time_spent || 'N/A'}</p></div>
+                                      <div><p className="text-[10px] text-[#9CA3AF] uppercase font-bold">Q12. Error Frequency</p><p className="text-sm text-[#E5E7EB]">{res.q12_error_frequency || 'N/A'}</p></div>
+                                      {res.q12b_recent_error_desc && <div><p className="text-[10px] text-[#9CA3AF] uppercase font-bold">Q12b. Recent Error</p><p className="text-sm text-[#FF4D4D] italic">{res.q12b_recent_error_desc}</p></div>}
+                                    </div>
+                                  </div>
+
+                                  <div className="bg-[#1A1A1B] p-5 rounded-xl border border-[#37373A]">
+                                    <h5 className="text-xs font-bold text-[#E5C100] uppercase tracking-widest mb-4 border-b border-[#37373A] pb-2">Pricing & Refusals</h5>
+                                    <div className="space-y-3">
+                                      <div><p className="text-[10px] text-[#9CA3AF] uppercase font-bold">Q18. Budget/Month</p><p className="text-sm text-[#E5E7EB]">{res.q18_willing_to_pay || 'N/A'}</p></div>
+                                      <div><p className="text-[10px] text-[#9CA3AF] uppercase font-bold">Q19. Payment Structure</p><p className="text-sm text-[#E5E7EB]">{res.q19_payment_structure || 'N/A'}</p></div>
+                                      <div><p className="text-[10px] text-[#9CA3AF] uppercase font-bold">Q20. Would Pay More For</p><p className="text-sm text-[#E5E7EB]">{Array.isArray(res.q20_premium_features) ? res.q20_premium_features.join(', ') : 'N/A'}</p></div>
+                                      <div><p className="text-[10px] text-[#9CA3AF] uppercase font-bold">Q21. Dealbreakers (Refusal)</p><p className="text-sm text-[#FF4D4D]">{Array.isArray(res.q21_refuse_to_pay_reasons) ? res.q21_refuse_to_pay_reasons.join(', ') : 'N/A'}</p></div>
+                                      <div><p className="text-[10px] text-[#9CA3AF] uppercase font-bold">Q22. Current Spend</p><p className="text-sm text-[#E5E7EB]">{res.q22_current_admin_spend || 'N/A'}</p></div>
+                                      <div><p className="text-[10px] text-[#9CA3AF] uppercase font-bold">Q23. Free Trial Opt-in</p><p className="text-sm text-[#E5E7EB]">{res.q23_free_trial_opt_in || 'N/A'}</p></div>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* COLUMN 3: Rankings & Feature Ratings */}
+                                <div className="space-y-6">
+                                  <div className="bg-[#1A1A1B] p-5 rounded-xl border border-[#37373A]">
+                                    <h5 className="text-xs font-bold text-[#E5C100] uppercase tracking-widest mb-4 border-b border-[#37373A] pb-2">Q10. Top Admin Challenges (Ranked)</h5>
+                                    {res.q10_top_challenges && typeof res.q10_top_challenges === 'object' && Object.keys(res.q10_top_challenges).length > 0 ? (
+                                      <ul className="space-y-2">
+                                        {Object.entries(res.q10_top_challenges)
+                                          .sort(([, a], [, b]) => (a as number) - (b as number))
+                                          .map(([challenge, rank]) => (
+                                            <li key={challenge} className="flex items-center gap-3 text-sm text-[#E5E7EB]">
+                                              <span className="w-5 h-5 flex items-center justify-center bg-[#E5C100] text-[#1A1A1B] font-black rounded-full text-xs">{rank as number}</span>
+                                              {challenge}
+                                            </li>
+                                        ))}
+                                      </ul>
+                                    ) : <p className="text-sm text-[#9CA3AF]">No ranking provided.</p>}
+                                  </div>
+
+                                  <div className="bg-[#1A1A1B] p-5 rounded-xl border border-[#37373A]">
+                                    <h5 className="text-xs font-bold text-[#00B8CC] uppercase tracking-widest mb-4 border-b border-[#37373A] pb-2">Feature Prioritization (1-5)</h5>
+                                    <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-[#37373A]">
+                                      
+                                      {[
+                                        { title: "Finance", data: res.feature_finance },
+                                        { title: "Student Mgt", data: res.feature_student },
+                                        { title: "Attendance", data: res.feature_attendance },
+                                        { title: "Academic", data: res.feature_academic },
+                                        { title: "Communication", data: res.feature_communication },
+                                        { title: "Analytics", data: res.feature_analytics }
+                                      ].map((group, idx) => group.data && typeof group.data === 'object' && Object.keys(group.data).length > 0 && (
+                                        <div key={idx} className="mb-3">
+                                          <p className="text-[10px] text-[#9CA3AF] uppercase font-bold mb-2">{group.title}</p>
+                                          {Object.entries(group.data).map(([feat, rating]) => (
+                                            <div key={feat} className="flex justify-between items-center text-xs mb-1">
+                                              <span className="text-[#E5E7EB] truncate pr-2">{feat}</span>
+                                              <span className={`font-bold px-1.5 py-0.5 rounded ${Number(rating) >= 4 ? 'bg-[#00B8CC]/20 text-[#00E5FF]' : Number(rating) <= 2 ? 'bg-red-500/20 text-red-400' : 'bg-[#37373A] text-gray-300'}`}>
+                                                {rating as string}/5
+                                              </span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      ))}
+
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* FULL WIDTH: Open Text Feedback */}
+                              <div className="bg-[#1A1A1B] p-5 rounded-xl border border-[#37373A]">
+                                <h5 className="text-xs font-bold text-[#00B8CC] uppercase tracking-widest mb-4 border-b border-[#37373A] pb-2">Open Text Feedback</h5>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                  <div>
+                                    <p className="text-[10px] text-[#9CA3AF] uppercase font-bold mb-1">Q24. Biggest problem?</p>
+                                    <p className="text-sm text-[#E5E7EB] bg-[#242426] p-3 rounded-lg border border-[#37373A] leading-relaxed italic">"{res.q24_biggest_problem || 'Left blank'}"</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-[10px] text-[#9CA3AF] uppercase font-bold mb-1">Q25. Desperate missing feature?</p>
+                                    <p className="text-sm text-[#E5E7EB] bg-[#242426] p-3 rounded-lg border border-[#37373A] leading-relaxed italic">"{res.q25_desperate_feature || 'Left blank'}"</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-[10px] text-[#9CA3AF] uppercase font-bold mb-1">Q26. Advice to proprietors?</p>
+                                    <p className="text-sm text-[#E5E7EB] bg-[#242426] p-3 rounded-lg border border-[#37373A] leading-relaxed italic">"{res.q26_advice_to_proprietors || 'Left blank'}"</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-[10px] text-[#9CA3AF] uppercase font-bold mb-1">Q27. Launch day requirement?</p>
+                                    <p className="text-sm text-[#E5E7EB] bg-[#242426] p-3 rounded-lg border border-[#37373A] leading-relaxed italic">"{res.q27_launch_day_requirement || 'Left blank'}"</p>
+                                  </div>
+                                  <div className="lg:col-span-2">
+                                    <p className="text-[10px] text-[#9CA3AF] uppercase font-bold mb-1">Q28. Other comments/concerns?</p>
+                                    <p className="text-sm text-[#E5E7EB] bg-[#242426] p-3 rounded-lg border border-[#37373A] leading-relaxed italic">"{res.q28_other_comments || 'Left blank'}"</p>
+                                  </div>
+                                </div>
+                              </div>
+
                             </div>
                           </td>
                         </tr>
@@ -536,7 +799,7 @@ export default function AnalyticsDashboard() {
         </div>
       )}
 
-      {/* VIEW 3: DIRECT BULK MESSAGING */}
+      {/* VIEW 4: DIRECT BULK MESSAGING */}
       {activeTab === 'messaging' && (
         <div className="max-w-4xl mx-auto animate-in fade-in duration-500">
           <div className="bg-[#242426] border border-[#37373A] rounded-2xl p-8 shadow-xl">
