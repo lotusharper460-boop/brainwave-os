@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import { supabase } from '../lib/supabase/client';
+import { supabase } from '@/utils/supabase/client';
 
 export default function ResearchInstrument() {
   const [isSubmitting, setIsSubmitting] = useState(false);
